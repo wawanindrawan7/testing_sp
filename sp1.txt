@@ -1,0 +1,482 @@
+/****** Object:  StoredProcedure [dbo].[sp_get_pickslipconfirmation_by_user_location]    Script Date: 27/09/2023 13.55.40 ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+-- =============================================
+-- Author:      <Author, , Name>
+-- Create Date: <Create Date, , >
+-- Description: <Description, , >
+-- =============================================
+ALTER PROCEDURE  [dbo].[sp_get_pickslipconfirmation_by_user_location]
+(
+	-- EXEC dbo.sp_get_pickslipconfirmation_by_user_location @user_id = 602 , @etdstart= '2023-04-18', @etdend = '2023-08-15'
+    @user_id INT,
+	@splittingid VARCHAR(max) = null,
+	@pickupcode VARCHAR(max)= null,
+	@destinationcode VARCHAR(max)= null,
+	@vendorcode VARCHAR(max)= null,
+	@trucktype VARCHAR(max)= null,
+	@pickstatus VARCHAR(max)=null,
+	@etdstart DATE = null, 
+	@etdend DATE = null,
+	@etastart DATE = null,
+	@etaend DATE = null
+)
+AS
+BEGIN
+    -- SET NOCOUNT ON added to prevent extra result sets from
+    -- interfering with SELECT statements.
+    SET NOCOUNT ON
+
+		DROP TABLE IF EXISTS #splittingid
+		CREATE TABLE #splittingid (obj VARCHAR(1000))
+
+		DROP TABLE IF EXISTS #pickupcode
+		CREATE TABLE #pickupcode (obj VARCHAR(1000))
+
+		DROP TABLE IF EXISTS #destinationcode
+		CREATE TABLE #destinationcode (obj VARCHAR(1000))
+
+		DROP TABLE IF EXISTS #vendorcode
+		CREATE TABLE #vendorcode (obj VARCHAR(1000))
+
+		DROP TABLE IF EXISTS #trucktype
+		CREATE TABLE #trucktype (obj VARCHAR(1000))
+
+		DROP TABLE IF EXISTS #pickstatus
+		CREATE TABLE #pickstatus (obj VARCHAR(1000))
+
+		IF (@splittingid IS NOT NULL AND @splittingid != '' AND @splittingid != 'null') BEGIN  
+			INSERT INTO #splittingid (obj)
+			SELECT [Value]
+			FROM OPENJSON(@splittingid)
+		END
+		ELSE BEGIN
+			SET @splittingid = NULL;
+		END 
+
+		IF (@pickupcode IS NOT NULL AND @pickupcode != '' AND @pickupcode != 'null') BEGIN  
+			INSERT INTO #pickupcode (obj)
+			SELECT [Value]
+			FROM OPENJSON(@pickupcode)
+		END
+		ELSE BEGIN
+			SET @pickupcode = NULL;
+		END 
+		IF (@destinationcode IS NOT NULL AND @destinationcode != '' AND @destinationcode != 'null') BEGIN  
+			INSERT INTO #destinationcode (obj)
+			SELECT [Value]
+			FROM OPENJSON(@destinationcode)
+		END
+		ELSE BEGIN
+			SET @destinationcode = NULL;
+		END 
+		IF (@vendorcode IS NOT NULL AND @vendorcode != '' AND @vendorcode != 'null') BEGIN  
+			INSERT INTO #vendorcode (obj)
+			SELECT [Value]
+			FROM OPENJSON(@vendorcode)
+		END
+		ELSE BEGIN
+			SET @vendorcode = NULL;
+		END 
+
+		IF (@trucktype IS NOT NULL AND @trucktype != '' AND @trucktype != 'null') BEGIN  
+			INSERT INTO #trucktype (obj)
+			SELECT [Value]
+			FROM OPENJSON(@trucktype)
+		END
+		ELSE BEGIN
+			SET @trucktype = NULL;
+		END 
+
+		IF (@pickstatus IS NOT NULL AND @pickstatus != '' AND @pickstatus != 'null') BEGIN  
+			INSERT INTO #pickstatus (obj)
+			SELECT [Value]
+			FROM OPENJSON(@pickstatus)
+		END
+		ELSE BEGIN
+			SET @pickstatus = NULL;
+		END 
+
+    -- Insert statements for procedure here
+	IF @etdstart IS NOT NULL AND @etdend IS NULL
+		BEGIN
+		SELECT
+		[splittingid],
+        [roundid],
+        [sourcetype],
+		[pickstatus],
+        [trucktype],
+        [truckdesc],
+        [pickupcode],
+        [pickupdesc],
+        [destinationcode],
+        [destinationdesc],
+		[etd],
+        [etddate],
+        [etdtime],
+		[eta],
+        [etadate],
+        [etatime],
+        [vendorcode],
+        [vendordesc],
+        [nopol],
+        [containerno],
+        [trucksource] 
+		FROM
+			[view_pickslip_confirmation] 
+		WHERE
+			pickupcode IN (
+			SELECT
+				location_id 
+			FROM
+				ms_lva_role_location 
+			WHERE
+				profile_id = (
+				SELECT
+					ms_user_member.profile_id 
+				FROM
+					dbo.ms_user_member
+					INNER JOIN dbo.ms_user_account ON ms_user_member.user_id = ms_user_account.id
+					INNER JOIN dbo.ms_profile ON ms_user_member.profile_id = ms_profile.id 
+				WHERE
+					user_id = @user_id
+					AND (@splittingid IS NULL OR splittingid in (SELECT obj FROM #splittingid))
+					AND (@pickupcode IS NULL OR pickupcode in (SELECT obj FROM #pickupcode))
+					AND (@destinationcode IS NULL OR destinationcode in (SELECT obj FROM #destinationcode))
+					AND (@vendorcode IS NULL OR vendorcode in (SELECT obj FROM #vendorcode))
+					AND (@pickstatus IS NULL OR pickstatus in (SELECT obj FROM #pickstatus))
+					AND (@trucktype IS NULL OR trucktype in (SELECT obj FROM #trucktype))
+					AND (@etdstart IS NULL OR etddate = @etdstart) 
+				)
+			)
+		GROUP BY
+		   [splittingid],
+        [roundid],
+        [sourcetype],
+        [pickstatus],
+        [trucktype],
+        [truckdesc],
+        [pickupcode],
+        [pickupdesc],
+        [destinationcode],
+        [destinationdesc],
+		[etd],
+        [etddate],
+        [etdtime],
+		[eta],
+        [etadate],
+        [etatime],
+        [vendorcode],
+        [vendordesc],
+        [nopol],
+        [containerno],
+        [trucksource]
+		ORDER BY
+			[etd] DESC
+	END
+	ELSE IF @etdstart IS NOT NULL AND @etdend IS NOT NULL
+	BEGIN
+		SELECT
+			[splittingid],
+        [roundid],
+        [sourcetype],
+        [pickstatus],
+        [trucktype],
+        [truckdesc],
+        [pickupcode],
+        [pickupdesc],
+        [destinationcode],
+        [destinationdesc],
+		[etd],
+        [etddate],
+        [etdtime],
+		[eta],
+        [etadate],
+        [etatime],
+        [vendorcode],
+        [vendordesc],
+        [nopol],
+        [containerno],
+        [trucksource] 
+		FROM
+			[view_pickslip_confirmation] 
+		WHERE
+			pickupcode IN (
+			SELECT
+				location_id 
+			FROM
+				ms_lva_role_location 
+			WHERE
+				profile_id = (
+				SELECT
+					ms_user_member.profile_id 
+				FROM
+					dbo.ms_user_member
+					INNER JOIN dbo.ms_user_account ON ms_user_member.user_id = ms_user_account.id
+					INNER JOIN dbo.ms_profile ON ms_user_member.profile_id = ms_profile.id 
+				WHERE
+					user_id = @user_id
+					AND (@splittingid IS NULL OR splittingid in (SELECT obj FROM #splittingid))
+					AND (@pickupcode IS NULL OR pickupcode in (SELECT obj FROM #pickupcode))
+					AND (@destinationcode IS NULL OR destinationcode in (SELECT obj FROM #destinationcode))
+					AND (@vendorcode IS NULL OR vendorcode in (SELECT obj FROM #vendorcode))
+					AND (@pickstatus IS NULL OR pickstatus in (SELECT obj FROM #pickstatus))
+					AND (@trucktype IS NULL OR trucktype in (SELECT obj FROM #trucktype))
+					AND etddate BETWEEN @etdstart AND @etdend 
+				)
+			)
+		GROUP BY
+		   [splittingid],
+        [roundid],
+        [sourcetype],
+        [pickstatus],
+        [trucktype],
+        [truckdesc],
+        [pickupcode],
+        [pickupdesc],
+        [destinationcode],
+        [destinationdesc],
+		[etd],
+        [etddate],
+        [etdtime],
+		[eta],
+        [etadate],
+        [etatime],
+        [vendorcode],
+        [vendordesc],
+        [nopol],
+        [containerno],
+        [trucksource] 
+		ORDER BY
+			[etd] DESC
+		END
+	ELSE IF @etastart IS NOT NULL AND @etaend IS NULL
+		BEGIN
+		SELECT
+		[splittingid],
+        [roundid],
+        [sourcetype],
+        [pickstatus],
+        [trucktype],
+        [truckdesc],
+        [pickupcode],
+        [pickupdesc],
+        [destinationcode],
+        [destinationdesc],
+		[etd],
+        [etddate],
+        [etdtime],
+		[eta],
+        [etadate],
+        [etatime],
+        [vendorcode],
+        [vendordesc],
+        [nopol],
+        [containerno],
+        [trucksource] 
+		FROM
+			[view_pickslip_confirmation] 
+		WHERE
+			pickupcode IN (
+			SELECT
+				location_id 
+			FROM
+				ms_lva_role_location 
+			WHERE
+				profile_id = (
+				SELECT
+					ms_user_member.profile_id 
+				FROM
+					dbo.ms_user_member
+					INNER JOIN dbo.ms_user_account ON ms_user_member.user_id = ms_user_account.id
+					INNER JOIN dbo.ms_profile ON ms_user_member.profile_id = ms_profile.id 
+				WHERE
+					user_id = @user_id
+					AND (@splittingid IS NULL OR splittingid in (SELECT obj FROM #splittingid))
+					AND (@pickupcode IS NULL OR pickupcode in (SELECT obj FROM #pickupcode))
+					AND (@destinationcode IS NULL OR destinationcode in (SELECT obj FROM #destinationcode))
+					AND (@vendorcode IS NULL OR vendorcode in (SELECT obj FROM #vendorcode))
+					AND (@pickstatus IS NULL OR pickstatus in (SELECT obj FROM #pickstatus))
+					AND (@trucktype IS NULL OR trucktype in (SELECT obj FROM #trucktype))
+					AND (@etastart IS NULL OR etadate = @etastart)
+				)
+			)
+		GROUP BY
+		    [splittingid],
+        [roundid],
+        [sourcetype],
+        [pickstatus],
+        [trucktype],
+        [truckdesc],
+        [pickupcode],
+        [pickupdesc],
+        [destinationcode],
+        [destinationdesc],
+		[etd],
+        [etddate],
+        [etdtime],
+		[eta],
+        [etadate],
+        [etatime],
+        [vendorcode],
+        [vendordesc],
+        [nopol],
+        [containerno],
+        [trucksource]
+		ORDER BY
+			[etd] DESC
+	END
+	ELSE IF @etastart IS NOT NULL AND @etaend IS NOT NULL
+	BEGIN
+		SELECT
+		[splittingid],
+        [roundid],
+        [sourcetype],
+        [pickstatus],
+        [trucktype],
+        [truckdesc],
+        [pickupcode],
+        [pickupdesc],
+        [destinationcode],
+        [destinationdesc],
+		[etd],
+        [etddate],
+        [etdtime],
+		[eta],
+        [etadate],
+        [etatime],
+        [vendorcode],
+        [vendordesc],
+        [nopol],
+        [containerno],
+        [trucksource] 
+		FROM
+			[view_pickslip_confirmation] 
+		WHERE
+			pickupcode IN (
+			SELECT
+				location_id 
+			FROM
+				ms_lva_role_location 
+			WHERE
+				profile_id = (
+				SELECT
+					ms_user_member.profile_id 
+				FROM
+					dbo.ms_user_member
+					INNER JOIN dbo.ms_user_account ON ms_user_member.user_id = ms_user_account.id
+					INNER JOIN dbo.ms_profile ON ms_user_member.profile_id = ms_profile.id 
+				WHERE
+					user_id = @user_id
+					AND (@splittingid IS NULL OR splittingid in (SELECT obj FROM #splittingid))
+					AND (@pickupcode IS NULL OR pickupcode in (@pickupcode))
+					AND (@destinationcode IS NULL OR destinationcode in (@destinationcode))
+					AND (@vendorcode IS NULL OR vendorcode in (@vendorcode))
+					AND (@pickstatus IS NULL OR pickstatus in (SELECT obj FROM #pickstatus))
+					AND (@trucktype IS NULL OR trucktype in (@trucktype))
+					AND etadate BETWEEN @etastart AND @etaend
+				)
+			)
+		GROUP BY
+		    [splittingid],
+        [roundid],
+        [sourcetype],
+        [pickstatus],
+        [trucktype],
+        [truckdesc],
+        [pickupcode],
+        [pickupdesc],
+        [destinationcode],
+        [destinationdesc],
+		[etd],
+        [etddate],
+        [etdtime],
+		[eta],
+        [etadate],
+        [etatime],
+        [vendorcode],
+        [vendordesc],
+        [nopol],
+        [containerno],
+        [trucksource]
+		ORDER BY
+			[etd] DESC
+		END
+	ELSE 
+		BEGIN
+		SELECT
+		 [splittingid],
+        [roundid],
+        [sourcetype],
+        [pickstatus],
+        [trucktype],
+        [truckdesc],
+        [pickupcode],
+        [pickupdesc],
+        [destinationcode],
+        [destinationdesc],
+		[etd],
+        [etddate],
+        [etdtime],
+		[eta],
+        [etadate],
+        [etatime],
+        [vendorcode],
+        [vendordesc],
+        [nopol],
+        [containerno],
+        [trucksource]
+		FROM
+			[view_pickslip_confirmation] 
+		WHERE
+			pickupcode IN (
+			SELECT
+				location_id 
+			FROM
+				ms_lva_role_location 
+			WHERE
+				profile_id = (
+				SELECT
+					ms_user_member.profile_id 
+				FROM
+					dbo.ms_user_member
+					INNER JOIN dbo.ms_user_account ON ms_user_member.user_id = ms_user_account.id
+					INNER JOIN dbo.ms_profile ON ms_user_member.profile_id = ms_profile.id 
+				WHERE
+					user_id = @user_id
+					AND (@splittingid IS NULL OR splittingid in (SELECT obj FROM #splittingid))
+					AND (@pickupcode IS NULL OR pickupcode in (SELECT obj FROM #pickupcode))
+					AND (@destinationcode IS NULL OR destinationcode in (SELECT obj FROM #destinationcode))
+					AND (@vendorcode IS NULL OR vendorcode in (SELECT obj FROM #vendorcode))
+					AND (@pickstatus IS NULL OR pickstatus in (SELECT obj FROM #pickstatus))
+					AND (@trucktype IS NULL OR trucktype in (SELECT obj FROM #trucktype))
+				)
+			)
+		GROUP BY
+		   [splittingid],
+        [roundid],
+        [sourcetype],
+        [pickstatus],
+        [trucktype],
+        [truckdesc],
+        [pickupcode],
+        [pickupdesc],
+        [destinationcode],
+        [destinationdesc],
+		[etd],
+        [etddate],
+        [etdtime],
+		[eta],
+        [etadate],
+        [etatime],
+        [vendorcode],
+        [vendordesc],
+        [nopol],
+        [containerno],
+        [trucksource]
+		ORDER BY
+			[etd] DESC
+		END
+END
